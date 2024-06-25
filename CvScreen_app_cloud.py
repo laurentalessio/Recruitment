@@ -66,7 +66,7 @@ def analyze_match(job_description, resume):
 
     try:
         response = client.chat.completions.create(
-            model="gpt-4",
+            model="gpt-4o",
             messages=[
                 {"role": "system", "content": "You are an expert HR assistant skilled in matching resumes to job descriptions."},
                 {"role": "user", "content": prompt}
