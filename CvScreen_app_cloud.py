@@ -117,10 +117,16 @@ def parse_analysis(analysis):
 
     return score, explanation, matching_skills, missing_qualifications, criteria_scores
 
+
 def create_overall_score_chart(results):
+    # Sort results by score in descending order
     sorted_results = sorted(results, key=lambda x: x[1], reverse=True)
+    
+    # Prepare data
     candidates = [result[0] for result in sorted_results]
     scores = [result[1] for result in sorted_results]
+    
+    # Wrap candidate names
     wrapped_candidates = ['\n'.join(wrap(name, width=15)) for name in candidates]
     
     fig = go.Figure(data=[
@@ -131,12 +137,42 @@ def create_overall_score_chart(results):
         title="Overall Candidate Scores",
         xaxis_title="Candidates",
         yaxis_title="Score",
-        yaxis=dict(range=[0, 100]),
-        height=500,
-        margin=dict(b=100)
+        yaxis=dict(range=[0, 100]),  # Set y-axis range from 0 to 100
+        height=500,  # Increase height to accommodate wrapped text
+        margin=dict(b=100)  # Increase bottom margin for x-axis labels
     )
     
     return fig
+
+
+
+# def create_overall_score_chart(results):
+#     sorted_results = sorted(results, key=lambda x: x[1], reverse=True)
+#     candidates = [result[0] for result in sorted_results]
+#     scores = [result[1] for result in sorted_results]
+    
+#     # Wrap candidate names
+#     wrapped_candidates = ['\n'.join(wrap(name, width=15)) for name in candidates]
+    
+#     fig = go.Figure(data=[
+#         go.Bar(x=wrapped_candidates, y=scores, text=scores, textposition='auto')
+#     ])
+    
+#     fig.update_layout(
+#         title="Overall Candidate Scores",
+#         xaxis_title="Candidates",
+#         yaxis_title="Score",
+#         yaxis=dict(range=[0, 100]),  # Ensure y-axis goes from 0 to 100
+#         height=500,
+#         margin=dict(b=100),
+#         bargap=0.2  # Add some gap between bars
+#     )
+    
+#     # Ensure bars start from 0
+#     fig.update_traces(marker_line_width=0, marker_color="rgb(0,116,217)")
+    
+#     return fig
+
 
 def create_candidate_radar_chart(criteria_scores):
     categories = list(criteria_scores.keys())
@@ -226,21 +262,21 @@ def create_pdf_report(results, job_description):
     return buffer
 
 
-
 def main():
     st.title("CV Matcher - powered by ChatGPT")
     st.write("LA - 25/06/2024")
-
-    job_description = st.text_area("Enter the job description:", height=200)
+    
+    # Add a unique key to the text_area
+    job_description = st.text_area("Enter the job description:", height=200, key="job_description_input")
+    
     uploaded_files = st.file_uploader("Upload CV files (PDF only)", type="pdf", accept_multiple_files=True)
-
     col1, col2 = st.columns(2)
     analyze_button = col1.button("Analyze Matches", key="analyze_button")
     export_button = col2.button("Export PDF Report", key="export_button")
-
+    
+    # Rest of the function remains the same
     if analyze_button and job_description and uploaded_files and client:
         results = []
-
         progress_bar = st.progress(0)
         for index, uploaded_file in enumerate(uploaded_files):
             try:
@@ -248,7 +284,6 @@ def main():
                     resume_text = ''
                     for page in pdf.pages:
                         resume_text += page.extract_text()
-
                 analysis = analyze_match(job_description, resume_text, model_option)
                 if analysis:
                     logging.info(f"Raw analysis for {uploaded_file.name}: {analysis}")
@@ -259,21 +294,15 @@ def main():
             except Exception as e:
                 st.error(f"Error processing {uploaded_file.name}: {str(e)}")
                 logging.error(f"Error processing {uploaded_file.name}: {str(e)}")
-
         st.session_state['results'] = results  # Store results in session state
-
         sorted_results = sorted(results, key=lambda x: x[1], reverse=True)
-
         st.sidebar.title("Candidate Rankings")
         ranking_df = pd.DataFrame([(result[0], result[1]) for result in sorted_results], columns=["Candidate", "Score"])
         st.sidebar.dataframe(ranking_df, hide_index=True)
-
         combined_radar_chart = create_combined_radar_chart(sorted_results)
         st.sidebar.plotly_chart(combined_radar_chart, use_container_width=True)
-
         overall_score_chart = create_overall_score_chart([(result[0], result[1]) for result in sorted_results])
         st.plotly_chart(overall_score_chart)
-
         for result in sorted_results:
             st.subheader(f"Candidate: {result[0]}")
             st.write(f"Score: {result[1]}")
@@ -281,23 +310,18 @@ def main():
             
             st.write("Matching Skills:")
             if result[3]:
-                for skill in result[3]:
-                    st.write(f"- {skill}")
+                st.write(", ".join(result[3]))
             else:
                 st.write("No specific matching skills identified.")
             
             st.write("Missing Qualifications:")
             if result[4]:
-                for qual in result[4]:
-                    st.write(f"- {qual}")
+                st.write(", ".join(result[4]))
             else:
                 st.write("No specific missing qualifications identified.")
-
             radar_chart = create_candidate_radar_chart(result[5])
             st.plotly_chart(radar_chart)
-
             st.markdown("---")
-
     if export_button and 'results' in st.session_state:
         try:
             pdf_buffer = create_pdf_report(st.session_state['results'], job_description)
@@ -311,6 +335,7 @@ def main():
         except Exception as e:
             st.error(f"Error creating PDF report: {str(e)}")
             logging.error(f"Error creating PDF report: {str(e)}")
+
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
