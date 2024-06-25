@@ -1,6 +1,6 @@
 streamlit
 pdfplumber
-openai==0.28
+openai
 python-dotenv
 plotly
 pandas
