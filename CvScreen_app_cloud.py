@@ -28,6 +28,8 @@ def extract_text_from_pdf(pdf_file):
             text += page.extract_text()
     return text
 
+
+
 def analyze_match(job_description, resume):
     if not client:
         st.error("OpenAI client is not initialized. Please enter your API key.")
@@ -43,8 +45,8 @@ def analyze_match(job_description, resume):
     Please analyze how well this resume matches the job description. Provide:
     1. A match score from 0 to 100
     2. A brief explanation of the score
-    3. Key matching skills or experiences (list up to 5)
-    4. Notable missing qualifications (list up to 5)
+    3. Key matching skills or experiences (list exactly 5, use 'N/A' if fewer than 5)
+    4. Notable missing qualifications (list exactly 5, use 'N/A' if fewer than 5)
     5. Scores for the following criteria (score each from 0 to 100):
        - Technical Skills
        - Work Experience
@@ -68,7 +70,7 @@ def analyze_match(job_description, resume):
         response = client.chat.completions.create(
             model="gpt-4o",
             messages=[
-                {"role": "system", "content": "You are an expert HR assistant skilled in matching resumes to job descriptions."},
+                {"role": "system", "content": "You are an expert HR assistant skilled in matching resumes to job descriptions. Always provide exactly 5 matching skills and 5 missing qualifications, using 'N/A' if there are fewer than 5."},
                 {"role": "user", "content": prompt}
             ]
         )
@@ -92,16 +94,95 @@ def parse_analysis(analysis):
             explanation = line.split(': ')[1]
         elif line.startswith("Matching Skills:"):
             skills = line.split(': ')[1] if len(line.split(': ')) > 1 else ""
-            matching_skills = [skill.strip() for skill in skills.split(',') if skill.strip()]
+            matching_skills = [skill.strip() for skill in skills.split(',') if skill.strip() and skill.strip() != 'N/A']
         elif line.startswith("Missing Qualifications:"):
             missing = line.split(': ')[1] if len(line.split(': ')) > 1 else ""
-            missing_qualifications = [qual.strip() for qual in missing.split(',') if qual.strip()]
+            missing_qualifications = [qual.strip() for qual in missing.split(',') if qual.strip() and qual.strip() != 'N/A']
         elif line.startswith("Technical Skills:") or line.startswith("Work Experience:") or \
              line.startswith("Education:") or line.startswith("Soft Skills:") or line.startswith("Overall Fit:"):
             criterion, score_str = line.split(': ')
             criteria_scores[criterion] = int(score_str)
 
     return score, explanation, matching_skills, missing_qualifications, criteria_scores
+
+
+
+
+
+# def analyze_match(job_description, resume):
+#     if not client:
+#         st.error("OpenAI client is not initialized. Please enter your API key.")
+#         return None
+
+#     prompt = f"""
+#     Job Description:
+#     {job_description}
+
+#     Resume:
+#     {resume}
+
+#     Please analyze how well this resume matches the job description. Provide:
+#     1. A match score from 0 to 100
+#     2. A brief explanation of the score
+#     3. Key matching skills or experiences (list up to 5)
+#     4. Notable missing qualifications (list up to 5)
+#     5. Scores for the following criteria (score each from 0 to 100):
+#        - Technical Skills
+#        - Work Experience
+#        - Education
+#        - Soft Skills
+#        - Overall Fit
+
+#     Format your response exactly as follows:
+#     Score: [score]
+#     Explanation: [explanation]
+#     Matching Skills: [skill1], [skill2], [skill3], [skill4], [skill5]
+#     Missing Qualifications: [missing1], [missing2], [missing3], [missing4], [missing5]
+#     Technical Skills: [score]
+#     Work Experience: [score]
+#     Education: [score]
+#     Soft Skills: [score]
+#     Overall Fit: [score]
+#     """
+
+#     try:
+#         response = client.chat.completions.create(
+#             model="gpt-4",
+#             messages=[
+#                 {"role": "system", "content": "You are an expert HR assistant skilled in matching resumes to job descriptions."},
+#                 {"role": "user", "content": prompt}
+#             ]
+#         )
+#         return response.choices[0].message.content
+#     except Exception as e:
+#         st.error(f"An error occurred while analyzing the match: {str(e)}")
+#         return None
+
+# def parse_analysis(analysis):
+#     lines = analysis.split('\n')
+#     score = 0
+#     explanation = ""
+#     matching_skills = []
+#     missing_qualifications = []
+#     criteria_scores = {}
+
+#     for line in lines:
+#         if line.startswith("Score:"):
+#             score = int(line.split(': ')[1])
+#         elif line.startswith("Explanation:"):
+#             explanation = line.split(': ')[1]
+#         elif line.startswith("Matching Skills:"):
+#             skills = line.split(': ')[1] if len(line.split(': ')) > 1 else ""
+#             matching_skills = [skill.strip() for skill in skills.split(',') if skill.strip()]
+#         elif line.startswith("Missing Qualifications:"):
+#             missing = line.split(': ')[1] if len(line.split(': ')) > 1 else ""
+#             missing_qualifications = [qual.strip() for qual in missing.split(',') if qual.strip()]
+#         elif line.startswith("Technical Skills:") or line.startswith("Work Experience:") or \
+#              line.startswith("Education:") or line.startswith("Soft Skills:") or line.startswith("Overall Fit:"):
+#             criterion, score_str = line.split(': ')
+#             criteria_scores[criterion] = int(score_str)
+
+#     return score, explanation, matching_skills, missing_qualifications, criteria_scores
 
 def create_overall_score_chart(results):
     sorted_results = sorted(results, key=lambda x: x[1], reverse=True)
