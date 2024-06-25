@@ -22,7 +22,7 @@ openai_api_key = st.sidebar.text_input("Enter your OpenAI API key", type="passwo
 # Model selection dropdown
 model_option = st.sidebar.selectbox(
     "Choose GPT model",
-    ("gpt-3.5-turbo", "gpt-4", "gpt-4-1106-preview")
+    ("gpt-3.5-turbo", "gpt-4", "gpt-4o")
 )
 
 # Initialize the OpenAI client
