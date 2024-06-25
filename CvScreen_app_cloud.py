@@ -227,16 +227,17 @@ def create_pdf_report(results, job_description):
 
 
 def main():
-    st.title("CV Matcher - powered by OpenAI ChatGPT")
+    st.title("CV Matcher - powered by ChatGPT")
     st.write("LA - 25/06/2024")
+
     job_description = st.text_area("Enter the job description:", height=200)
     uploaded_files = st.file_uploader("Upload CV files (PDF only)", type="pdf", accept_multiple_files=True)
 
     col1, col2 = st.columns(2)
-    analyze_button = col1.button("Analyze Matches")
-    export_button = col2.button("Export PDF Report")
-    
-    if st.button("Analyze Matches") and job_description and uploaded_files and client:
+    analyze_button = col1.button("Analyze Matches", key="analyze_button")
+    export_button = col2.button("Export PDF Report", key="export_button")
+
+    if analyze_button and job_description and uploaded_files and client:
         results = []
 
         for uploaded_file in uploaded_files:
@@ -245,11 +246,13 @@ def main():
                 for page in pdf.pages:
                     resume_text += page.extract_text()
 
-            analysis = analyze_match(job_description, resume_text)
+            analysis = analyze_match(job_description, resume_text, model_option)
             if analysis:
                 print("Raw analysis:", analysis)  # Print raw analysis for debugging
                 score, explanation, matching_skills, missing_qualifications, criteria_scores = parse_analysis(analysis)
                 results.append((uploaded_file.name, score, explanation, matching_skills, missing_qualifications, criteria_scores))
+
+        st.session_state['results'] = results  # Store results in session state
 
         sorted_results = sorted(results, key=lambda x: x[1], reverse=True)
 
@@ -267,10 +270,20 @@ def main():
             st.subheader(f"Candidate: {result[0]}")
             st.write(f"Score: {result[1]}")
             st.write(f"Explanation: {result[2]}")
+            
             st.write("Matching Skills:")
-            st.write(", ".join(result[3]))
+            if result[3]:
+                for skill in result[3]:
+                    st.write(f"- {skill}")
+            else:
+                st.write("No specific matching skills identified.")
+            
             st.write("Missing Qualifications:")
-            st.write(", ".join(result[4]))
+            if result[4]:
+                for qual in result[4]:
+                    st.write(f"- {qual}")
+            else:
+                st.write("No specific missing qualifications identified.")
 
             radar_chart = create_candidate_radar_chart(result[5])
             st.plotly_chart(radar_chart)
@@ -283,9 +296,9 @@ def main():
             label="Download PDF Report",
             data=pdf_buffer,
             file_name="cv_matcher_report.pdf",
-            mime="application/pdf"
+            mime="application/pdf",
+            key="download_button"
         )
-
 
 if __name__ == "__main__":
     main()
