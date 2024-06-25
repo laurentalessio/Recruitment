@@ -2,13 +2,14 @@
 import streamlit as st
 import os
 import tempfile
-import PyPDF2
 import openai
 from dotenv import load_dotenv
 import plotly.graph_objects as go
 import plotly.express as px
 from textwrap import wrap
 import pandas as pd
+import pdfplumber
+
 
 # Load environment variables
 load_dotenv()
@@ -27,11 +28,13 @@ else:
 
 
 def extract_text_from_pdf(pdf_file):
-    pdf_reader = PyPDF2.PdfReader(pdf_file)
     text = ''
-    for page in pdf_reader.pages:
-        text += page.extract_text()
+    with pdfplumber.open(pdf_file) as pdf:
+        for page in pdf.pages:
+            text += page.extract_text()
     return text
+
+
 
 def analyze_match(job_description, resume):
     prompt = f"""
@@ -66,7 +69,7 @@ def analyze_match(job_description, resume):
     """
 
     response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
+        model="gpt-4o",
         messages=[
             {"role": "system", "content": "You are an expert HR assistant skilled in matching resumes to job descriptions."},
             {"role": "user", "content": prompt}
@@ -176,12 +179,10 @@ def main():
 
         # Process each uploaded CV
         for uploaded_file in uploaded_files:
-            with tempfile.NamedTemporaryFile(delete=False) as temp_file:
-                temp_file.write(uploaded_file.read())
-                temp_file_path = temp_file.name
-
-            resume_text = extract_text_from_pdf(temp_file_path)
-            os.unlink(temp_file_path)  # Delete the temporary file
+            with pdfplumber.open(uploaded_file) as pdf:
+                resume_text = ''
+                for page in pdf.pages:
+                    resume_text += page.extract_text()
 
             analysis = analyze_match(job_description, resume_text)
             print("Raw analysis:", analysis)  # Print raw analysis for debugging
