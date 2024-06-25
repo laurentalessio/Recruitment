@@ -241,8 +241,8 @@ def create_combined_radar_chart(results):
     return fig
 
 def main():
-    st.title("CV Matcher")
-
+    st.title("CV Matcher - powered by OpenAI ChatGPT")
+    st.write("LA - 25/06/2024")
     job_description = st.text_area("Enter the job description:", height=200)
     uploaded_files = st.file_uploader("Upload CV files (PDF only)", type="pdf", accept_multiple_files=True)
 
