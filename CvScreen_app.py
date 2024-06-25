@@ -65,7 +65,7 @@ def analyze_match(job_description, resume):
 
     try:
         response = openai.ChatCompletion.create(
-            model="gpt-4o",
+            model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": "You are an expert HR assistant skilled in matching resumes to job descriptions."},
                 {"role": "user", "content": prompt}
