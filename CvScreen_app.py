@@ -1,39 +1,38 @@
-
 import streamlit as st
-import os
-import tempfile
-import PyPDF2
-import openai
+import pdfplumber
+from openai import OpenAI
 from dotenv import load_dotenv
 import plotly.graph_objects as go
 import plotly.express as px
 from textwrap import wrap
 import pandas as pd
+import os
 
 # Load environment variables
 load_dotenv()
 
+# Streamlit interface for API key input
+openai_api_key = st.sidebar.text_input("Enter your OpenAI API key", type="password")
 
-
-# Add a text input for the OpenAI API key
-openai_api_key = st.text_input("Enter your OpenAI API key:", type="password")
-
-# Ensure the OpenAI API key is set
+# Initialize the OpenAI client
+client = None
 if openai_api_key:
-    openai.api_key = openai_api_key
+    client = OpenAI(api_key=openai_api_key)
 else:
     st.warning("Please enter your OpenAI API key to proceed.")
 
-
-
 def extract_text_from_pdf(pdf_file):
-    pdf_reader = PyPDF2.PdfReader(pdf_file)
     text = ''
-    for page in pdf_reader.pages:
-        text += page.extract_text()
+    with pdfplumber.open(pdf_file) as pdf:
+        for page in pdf.pages:
+            text += page.extract_text()
     return text
 
 def analyze_match(job_description, resume):
+    if not client:
+        st.error("OpenAI client is not initialized. Please enter your API key.")
+        return None
+
     prompt = f"""
     Job Description:
     {job_description}
@@ -65,15 +64,18 @@ def analyze_match(job_description, resume):
     Overall Fit: [score]
     """
 
-    response = openai.ChatCompletion.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "system", "content": "You are an expert HR assistant skilled in matching resumes to job descriptions."},
-            {"role": "user", "content": prompt}
-        ]
-    )
-
-    return response.choices[0].message.content
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": "You are an expert HR assistant skilled in matching resumes to job descriptions."},
+                {"role": "user", "content": prompt}
+            ]
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        st.error(f"An error occurred while analyzing the match: {str(e)}")
+        return None
 
 def parse_analysis(analysis):
     lines = analysis.split('\n')
@@ -102,14 +104,9 @@ def parse_analysis(analysis):
     return score, explanation, matching_skills, missing_qualifications, criteria_scores
 
 def create_overall_score_chart(results):
-    # Sort results by score in descending order
     sorted_results = sorted(results, key=lambda x: x[1], reverse=True)
-    
-    # Prepare data
     candidates = [result[0] for result in sorted_results]
     scores = [result[1] for result in sorted_results]
-    
-    # Wrap candidate names
     wrapped_candidates = ['\n'.join(wrap(name, width=15)) for name in candidates]
     
     fig = go.Figure(data=[
@@ -120,9 +117,9 @@ def create_overall_score_chart(results):
         title="Overall Candidate Scores",
         xaxis_title="Candidates",
         yaxis_title="Score",
-        yaxis=dict(range=[0, 100]),  # Set y-axis range from 0 to 100
-        height=500,  # Increase height to accommodate wrapped text
-        margin=dict(b=100)  # Increase bottom margin for x-axis labels
+        yaxis=dict(range=[0, 100]),
+        height=500,
+        margin=dict(b=100)
     )
     
     return fig
@@ -165,33 +162,26 @@ def create_combined_radar_chart(results):
 def main():
     st.title("CV Matcher")
 
-    # Job description input
     job_description = st.text_area("Enter the job description:", height=200)
-
-    # File uploader for CVs
     uploaded_files = st.file_uploader("Upload CV files (PDF only)", type="pdf", accept_multiple_files=True)
 
-    if st.button("Analyze Matches") and job_description and uploaded_files:
+    if st.button("Analyze Matches") and job_description and uploaded_files and client:
         results = []
 
-        # Process each uploaded CV
         for uploaded_file in uploaded_files:
-            with tempfile.NamedTemporaryFile(delete=False) as temp_file:
-                temp_file.write(uploaded_file.read())
-                temp_file_path = temp_file.name
-
-            resume_text = extract_text_from_pdf(temp_file_path)
-            os.unlink(temp_file_path)  # Delete the temporary file
+            with pdfplumber.open(uploaded_file) as pdf:
+                resume_text = ''
+                for page in pdf.pages:
+                    resume_text += page.extract_text()
 
             analysis = analyze_match(job_description, resume_text)
-            print("Raw analysis:", analysis)  # Print raw analysis for debugging
-            score, explanation, matching_skills, missing_qualifications, criteria_scores = parse_analysis(analysis)
-            results.append((uploaded_file.name, score, explanation, matching_skills, missing_qualifications, criteria_scores))
+            if analysis:
+                print("Raw analysis:", analysis)  # Print raw analysis for debugging
+                score, explanation, matching_skills, missing_qualifications, criteria_scores = parse_analysis(analysis)
+                results.append((uploaded_file.name, score, explanation, matching_skills, missing_qualifications, criteria_scores))
 
-        # Sort results by score
         sorted_results = sorted(results, key=lambda x: x[1], reverse=True)
 
-        # Sidebar content
         st.sidebar.title("Candidate Rankings")
         ranking_df = pd.DataFrame([(result[0], result[1]) for result in sorted_results], columns=["Candidate", "Score"])
         st.sidebar.dataframe(ranking_df, hide_index=True)
@@ -199,11 +189,9 @@ def main():
         combined_radar_chart = create_combined_radar_chart(sorted_results)
         st.sidebar.plotly_chart(combined_radar_chart, use_container_width=True)
 
-        # Main content
         overall_score_chart = create_overall_score_chart([(result[0], result[1]) for result in sorted_results])
         st.plotly_chart(overall_score_chart)
 
-        # Display detailed results for each candidate
         for result in sorted_results:
             st.subheader(f"Candidate: {result[0]}")
             st.write(f"Score: {result[1]}")
@@ -213,11 +201,10 @@ def main():
             st.write("Missing Qualifications:")
             st.write(", ".join(result[4]))
 
-            # Create and display radar chart for the candidate
             radar_chart = create_candidate_radar_chart(result[5])
             st.plotly_chart(radar_chart)
 
-            st.markdown("---")  # Add a separator between candidates
+            st.markdown("---")
 
 if __name__ == "__main__":
     main()
