@@ -1,14 +1,12 @@
-
 import streamlit as st
-import os
-import tempfile
-import openai
+import pdfplumber
+from openai import OpenAI
 from dotenv import load_dotenv
 import plotly.graph_objects as go
 import plotly.express as px
 from textwrap import wrap
 import pandas as pd
-import pdfplumber
+import os
 
 
 # Load environment variables
@@ -33,6 +31,50 @@ def extract_text_from_pdf(pdf_file):
         for page in pdf.pages:
             text += page.extract_text()
     return text
+
+
+
+# def analyze_match(job_description, resume):
+#     prompt = f"""
+#     Job Description:
+#     {job_description}
+
+#     Resume:
+#     {resume}
+
+#     Please analyze how well this resume matches the job description. Provide:
+#     1. A match score from 0 to 100
+#     2. A brief explanation of the score
+#     3. Key matching skills or experiences (list up to 5)
+#     4. Notable missing qualifications (list up to 5)
+#     5. Scores for the following criteria (score each from 0 to 100):
+#        - Technical Skills
+#        - Work Experience
+#        - Education
+#        - Soft Skills
+#        - Overall Fit
+
+#     Format your response exactly as follows:
+#     Score: [score]
+#     Explanation: [explanation]
+#     Matching Skills: [skill1], [skill2], [skill3], [skill4], [skill5]
+#     Missing Qualifications: [missing1], [missing2], [missing3], [missing4], [missing5]
+#     Technical Skills: [score]
+#     Work Experience: [score]
+#     Education: [score]
+#     Soft Skills: [score]
+#     Overall Fit: [score]
+#     """
+
+#     response = openai.ChatCompletion.create(
+#         model="gpt-4o",
+#         messages=[
+#             {"role": "system", "content": "You are an expert HR assistant skilled in matching resumes to job descriptions."},
+#             {"role": "user", "content": prompt}
+#         ]
+#     )
+
+#     return response.choices[0].message.content
 
 
 
@@ -68,8 +110,8 @@ def analyze_match(job_description, resume):
     Overall Fit: [score]
     """
 
-    response = openai.ChatCompletion.create(
-        model="gpt-4o",
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo",
         messages=[
             {"role": "system", "content": "You are an expert HR assistant skilled in matching resumes to job descriptions."},
             {"role": "user", "content": prompt}
@@ -77,6 +119,8 @@ def analyze_match(job_description, resume):
     )
 
     return response.choices[0].message.content
+
+
 
 def parse_analysis(analysis):
     lines = analysis.split('\n')
