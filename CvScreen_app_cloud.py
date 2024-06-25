@@ -12,6 +12,7 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.utils import ImageReader
 from io import BytesIO
 import base64
+import logging
 
 # Load environment variables
 load_dotenv()
@@ -240,17 +241,24 @@ def main():
     if analyze_button and job_description and uploaded_files and client:
         results = []
 
-        for uploaded_file in uploaded_files:
-            with pdfplumber.open(uploaded_file) as pdf:
-                resume_text = ''
-                for page in pdf.pages:
-                    resume_text += page.extract_text()
+        progress_bar = st.progress(0)
+        for index, uploaded_file in enumerate(uploaded_files):
+            try:
+                with pdfplumber.open(uploaded_file) as pdf:
+                    resume_text = ''
+                    for page in pdf.pages:
+                        resume_text += page.extract_text()
 
-            analysis = analyze_match(job_description, resume_text, model_option)
-            if analysis:
-                print("Raw analysis:", analysis)  # Print raw analysis for debugging
-                score, explanation, matching_skills, missing_qualifications, criteria_scores = parse_analysis(analysis)
-                results.append((uploaded_file.name, score, explanation, matching_skills, missing_qualifications, criteria_scores))
+                analysis = analyze_match(job_description, resume_text, model_option)
+                if analysis:
+                    logging.info(f"Raw analysis for {uploaded_file.name}: {analysis}")
+                    score, explanation, matching_skills, missing_qualifications, criteria_scores = parse_analysis(analysis)
+                    results.append((uploaded_file.name, score, explanation, matching_skills, missing_qualifications, criteria_scores))
+                
+                progress_bar.progress((index + 1) / len(uploaded_files))
+            except Exception as e:
+                st.error(f"Error processing {uploaded_file.name}: {str(e)}")
+                logging.error(f"Error processing {uploaded_file.name}: {str(e)}")
 
         st.session_state['results'] = results  # Store results in session state
 
@@ -291,14 +299,23 @@ def main():
             st.markdown("---")
 
     if export_button and 'results' in st.session_state:
-        pdf_buffer = create_pdf_report(st.session_state['results'], job_description)
-        st.download_button(
-            label="Download PDF Report",
-            data=pdf_buffer,
-            file_name="cv_matcher_report.pdf",
-            mime="application/pdf",
-            key="download_button"
-        )
+        try:
+            pdf_buffer = create_pdf_report(st.session_state['results'], job_description)
+            st.download_button(
+                label="Download PDF Report",
+                data=pdf_buffer,
+                file_name="cv_matcher_report.pdf",
+                mime="application/pdf",
+                key="download_button"
+            )
+        except Exception as e:
+            st.error(f"Error creating PDF report: {str(e)}")
+            logging.error(f"Error creating PDF report: {str(e)}")
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
     main()
+
+
+
+
